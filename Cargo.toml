@@ -1,7 +1,33 @@
 [package]
 name = "stackable-orchestrator"
 version = "0.1.0"
-authors = ["Sönke Liebau <soenke.liebau@stackable.de>"]
+authors = [
+    "Sönke Liebau <soenke.liebau@stackable.de>",
+    "Lars Francke <lars.francke@stackable.de>"
+]
 edition = "2018"
 
+[[bin]]
+doc = false
+name = "orchestrator"
+path = "src/main.rs"
+
+[lib]
+name = "orchestrator"
+path = "src/lib.rs"
+
 [dependencies]
+actix-web = "3"
+bytes = "0.5"
+env_logger = "0.7.1"
+futures = "0.3"
+k8s-openapi = { version = "0.9.0", default-features = false, features = ["v1_18"] }
+log = "0.4.0"
+r2d2 = "0.8"
+r2d2_sqlite = "0.17"
+rusqlite = "0.24"
+serde = "1.0"
+serde_json = "1.0"
+stackable_config = { version = "0.1", path = "../stackable-common/config" }
+
+#stackable_logging = { version = "0.1", path="../stackable-common/logging" }

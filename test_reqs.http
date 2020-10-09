@@ -1,0 +1,24 @@
+### Send a new resource
+POST http://localhost:8080/apis/apiextensions.k8s.io/v1/customresourcedefinitions
+Content-Type: application/json
+
+{
+  "metadata": {
+    "name": "foobar"
+  },
+  "spec": {
+    "group" : "bla",
+    "names" : {
+      "plural": "foo",
+      "singular": "bar",
+      "kind": "bla bla"
+    },
+    "scope": "Namespaced",
+    "versions": []
+
+  }
+}
+
+### Start a watch - IntelliJ buffers the response, to see it on the command line run
+### curl -N  http://localhost:8080/apis/apiextensions.k8s.io/v1/customresourcedefinitions
+GET http://localhost:8080/apis/apiextensions.k8s.io/v1/customresourcedefinitions
