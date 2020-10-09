@@ -1,12 +1,13 @@
-use actix_web::Error;
-use bytes::Bytes;
-use futures::Stream;
-use serde::Serialize;
 use std::pin::Pin;
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::Mutex;
 use std::task::{Context, Poll};
 use std::time::Duration;
+
+use actix_web::Error;
+use bytes::Bytes;
+use futures::Stream;
+use serde::Serialize;
 
 pub trait Observer {
     fn notify(&mut self, event: &WatchEvent);
@@ -42,12 +43,13 @@ impl EventBroker {
             result.len(),
             event
         );
-        result.iter().for_each(|obs| {
+        result.iter().enumerate().for_each(|(idx, obs)| {
             let send_result = obs.send(WatchEvent::ADDED);
             match send_result {
                 Err(_) => {
                     println!("Error sending, removing observer");
-                    //self.observers.
+                    // TODO: Need to remove observer, this doesn't work yet:
+                    // result.swap_remove(idx);
                 }
                 Ok(_) => {}
             }

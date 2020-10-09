@@ -1,0 +1,13 @@
+= Running
+
+    cargo run
+
+Binds to `localhost:8080`.
+
+There are test requests in `test_reqs.http` which can be run using IntelliJ.
+
+To `watch` run:
+
+    curl -N  http://localhost:8080/apis/apiextensions.k8s.io/v1/customresourcedefinitions
+
+This also works from within IntelliJ but it seems to buffer the streaming response and doesn't print the results.

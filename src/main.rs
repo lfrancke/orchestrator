@@ -3,20 +3,16 @@ mod crd;
 mod storage_sqlite;
 mod watch;
 
-use actix_web::{
-    get, middleware::Logger, post, web, App, HttpRequest, HttpResponse, HttpServer, Responder,
-};
 use crate::config::OrchestratorConfig;
-use crate::crd::list_custom_resource_definitions;
+use crate::crd::{add_custom_resource_definition, list_custom_resource_definitions};
 use crate::watch::{EventBroker, WatchEvent};
-use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
-use r2d2::Pool;
-use r2d2_sqlite::SqliteConnectionManager;
-use rusqlite::params;
-use stackable_config::get_matcher;
+
 use std::sync::mpsc::Sender;
 use std::sync::{mpsc, Arc};
 use std::{env, thread};
+
+use actix_web::{get, middleware::Logger, App, HttpRequest, HttpResponse, HttpServer, Responder};
+use stackable_config::get_matcher;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -25,7 +21,7 @@ async fn main() -> std::io::Result<()> {
         "ORCHESTRATOR_CONFIG_FILE",
         env::args_os().collect(),
     )
-        .expect("unexpected error occurred when parsing parameters");
+    .expect("unexpected error occurred when parsing parameters");
 
     let bind_address = matcher
         .value_of(OrchestratorConfig::BIND_ADDRESS.name)
@@ -62,9 +58,9 @@ async fn main() -> std::io::Result<()> {
             .service(add_custom_resource_definition)
             .service(list_custom_resource_definitions)
     })
-        .bind(format!("{}:{}", bind_address, bind_port))
-        .expect(format!("Can't bind to {}:{}", bind_address, bind_port).as_str())
-        .run();
+    .bind(format!("{}:{}", bind_address, bind_port))
+    .expect(format!("Can't bind to {}:{}", bind_address, bind_port).as_str())
+    .run();
 
     // Here we spawn two new threads
     // 1. Just waits for new registration events of Watchers
@@ -100,24 +96,4 @@ async fn main() -> std::io::Result<()> {
 #[get("/health")]
 async fn health(_: HttpRequest) -> impl Responder {
     HttpResponse::Ok().json("healthy")
-}
-
-#[post("/apis")]
-async fn add_custom_resource_definition(
-    crd: web::Json<CustomResourceDefinition>,
-    db: web::Data<Pool<SqliteConnectionManager>>,
-    event_sender: web::Data<Sender<WatchEvent>>,
-) -> impl Responder {
-    //println!("CRD: {:?}", crd);
-
-    let res = event_sender.send(WatchEvent::ADDED);
-
-    let crd = &crd.into_inner();
-
-    let text_data = serde_json::to_string(&crd).unwrap();
-
-    let conn = &db.get().unwrap();
-    let res = conn.execute("INSERT INTO data(id, json) VALUES (?1, ?2) ON CONFLICT(id) DO UPDATE SET json=excluded.json", params![crd.metadata.name.clone().unwrap(), text_data]);
-    //println!("{:?}", result);
-    HttpResponse::Ok().body(format!("Got CRD"))
 }
