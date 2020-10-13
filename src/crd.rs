@@ -1,14 +1,18 @@
+use crate::storage::Storage;
+use crate::storage_sqlite::SqliteStorage;
 use crate::watch::{WatchEvent, WatchStream};
 
 use std::sync::mpsc;
 use std::sync::mpsc::Sender;
 
-use actix_web::{get, post};
+use actix_web::{get, post, Error};
 use actix_web::{web, HttpResponse, Responder};
+use bytes::Buf;
 use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
-use r2d2::Pool;
-use r2d2_sqlite::SqliteConnectionManager;
-use rusqlite::params;
+use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+
 
 /// This lists CustomResourceDefinitions registered in the server
 /// The request will currently always be a "watch" on new resources
@@ -32,19 +36,57 @@ pub async fn list_custom_resource_definitions(
 #[post("/apis/apiextensions.k8s.io/v1/customresourcedefinitions")]
 pub async fn add_custom_resource_definition(
     crd: web::Json<CustomResourceDefinition>,
-    db: web::Data<Pool<SqliteConnectionManager>>,
-    event_sender: web::Data<Sender<WatchEvent>>,
+    storage: web::Data<SqliteStorage>,
 ) -> impl Responder {
-    //println!("CRD: {:?}", crd);
-
-    let res = event_sender.send(WatchEvent::ADDED);
-
-    let crd = &crd.into_inner();
-
+    // TODO: A CRD is also a watchable resource so it should also notify the event system
+    let crd = crd.into_inner();
     let text_data = serde_json::to_string(&crd).unwrap();
 
-    let conn = &db.get().unwrap();
-    let res = conn.execute("INSERT INTO data(id, json) VALUES (?1, ?2) ON CONFLICT(id) DO UPDATE SET json=excluded.json", params![crd.metadata.name.clone().unwrap(), text_data]);
-    //println!("{:?}", result);
+    storage.create(&crd.metadata.name.unwrap(), &text_data.into_bytes());
     HttpResponse::Ok().body(format!("Got CRD"))
+}
+
+#[derive(Deserialize, Debug)]
+pub struct CrdCoordinates {
+    group: String,
+    version: String,
+    name: String
+}
+
+
+#[get("/apis/{group}/{version}/{name}")]
+pub async fn handle_crd_get(
+    coordinates: web::Path<CrdCoordinates>
+    // TODO: We need an object here that provides access to Storage saved in Actix Data
+) -> impl Responder {
+    println!("{:?}", coordinates);
+
+    HttpResponse::Ok()
+        .content_type("application/json")
+        .body(format!("bla"))
+}
+
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct CustomResource {
+    metadata: ObjectMeta,
+
+    #[serde(flatten)]
+    remainder: Value
+}
+
+#[post("/apis/{group}/{version}/{name}")]
+pub async fn handle_crd_create(
+    coordinates: web::Path<CrdCoordinates>,
+    storage: web::Data<SqliteStorage>,
+    bytes: web::Bytes,
+    event_sender: web::Data<Sender<WatchEvent>>,
+) -> Result<HttpResponse, Error> {
+    let crd: CustomResource = serde_json::from_slice(bytes.bytes())?;
+
+    let name = format!("{}/{}/{}/{}", coordinates.group, coordinates.version, coordinates.name, crd.metadata.name.clone().unwrap());
+
+    storage.into_inner().create(&name, &bytes.to_vec());
+    event_sender.send(WatchEvent::ADDED(crd));
+    Ok(HttpResponse::Ok().finish())
 }

@@ -1,10 +1,11 @@
 mod config;
 mod crd;
+mod storage;
 mod storage_sqlite;
 mod watch;
 
 use crate::config::OrchestratorConfig;
-use crate::crd::{add_custom_resource_definition, list_custom_resource_definitions};
+use crate::crd::{add_custom_resource_definition, list_custom_resource_definitions, handle_crd_create, handle_crd_get};
 use crate::watch::{EventBroker, WatchEvent};
 
 use std::sync::mpsc::Sender;
@@ -13,6 +14,7 @@ use std::{env, thread};
 
 use actix_web::{get, middleware::Logger, App, HttpRequest, HttpResponse, HttpServer, Responder};
 use stackable_config::get_matcher;
+use storage_sqlite::SqliteStorage;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -47,16 +49,20 @@ async fn main() -> std::io::Result<()> {
     let (reg_tx, reg_rx) = mpsc::channel::<Sender<WatchEvent>>();
     let (evt_tx, evt_rx) = mpsc::channel::<WatchEvent>();
 
+    let storage = SqliteStorage::new();
+
     // This creates and runs the actual Web Server
     let server = HttpServer::new(move || {
         App::new()
-            .data(storage_sqlite::get_pool().clone())
+            .data(storage.clone())
             .data(reg_tx.clone())
             .data(evt_tx.clone())
             .wrap(Logger::default())
             .service(health)
             .service(add_custom_resource_definition)
             .service(list_custom_resource_definitions)
+            .service(handle_crd_get) // It is important that this be added _after_ the more specific ones because this catches everything that begins with /apis
+            .service(handle_crd_create) // It is important that this be added _after_ the more specific ones because this catches everything that begins with /apis
     })
     .bind(format!("{}:{}", bind_address, bind_port))
     .expect(format!("Can't bind to {}:{}", bind_address, bind_port).as_str())

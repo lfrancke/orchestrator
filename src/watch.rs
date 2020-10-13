@@ -1,3 +1,5 @@
+use crate::crd::CustomResource;
+
 use std::pin::Pin;
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::Mutex;
@@ -9,16 +11,12 @@ use bytes::Bytes;
 use futures::Stream;
 use serde::Serialize;
 
-pub trait Observer {
-    fn notify(&mut self, event: &WatchEvent);
-}
-
 /// Variants of this enum will be returned for all _watch_ requests.
 /// Kubernetes has the additional BOOKMARK and ERROR Types which are not implemented here yet.
 #[derive(Clone, Debug, Serialize)]
 #[serde(tag = "type", content = "object", rename_all = "UPPERCASE")]
 pub enum WatchEvent {
-    ADDED,
+    ADDED(CustomResource),
 }
 
 // This is the struct that will get notified about new events
@@ -44,7 +42,7 @@ impl EventBroker {
             event
         );
         result.iter().enumerate().for_each(|(idx, obs)| {
-            let send_result = obs.send(WatchEvent::ADDED);
+            let send_result = obs.send(event.clone());
             match send_result {
                 Err(_) => {
                     println!("Error sending, removing observer");
@@ -63,6 +61,7 @@ impl EventBroker {
 }
 
 // This is the stream that will get notified about new events
+// There will be one for each running long-poll
 pub struct WatchStream {
     receiver: Receiver<WatchEvent>,
 }
@@ -85,15 +84,15 @@ impl Stream for WatchStream {
     // TODO: The context has a "Waker" which needs to be passed to the EventBroker so it can wake up the required threads
     fn poll_next(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let result = self.receiver.recv_timeout(Duration::from_secs(1));
-        match result {
+        return match result {
             Ok(x) => {
                 println!("Received new watch event {:?}", x);
                 let mut json = serde_json::to_vec(&x).unwrap();
                 let mut newline = "\n".as_bytes().to_vec();
                 json.append(&mut newline);
-                return Poll::Ready(Some(Ok(Bytes::from(json))));
+                Poll::Ready(Some(Ok(Bytes::from(json))))
             }
-            Err(_) => return Poll::Pending,
+            Err(_) => Poll::Pending,
         }
     }
 }
