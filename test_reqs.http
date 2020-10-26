@@ -1,6 +1,245 @@
 ### Send a new resource
 POST http://localhost:8080/apis/apiextensions.k8s.io/v1/customresourcedefinitions
 Content-Type: application/json
+
+{
+  "metadata": {
+    "name": "customresourcedefinitions.apiextensions.k8s.io"
+  },
+  "spec": {
+    "group" : "apiextensions.k8s.io",
+    "names" : {
+      "plural": "customresourcedefinitions",
+      "singular": "customresourcedefinition",
+      "kind": "CustomResourceDefinition"
+    },
+    "scope": "Cluster",
+    "versions": [
+      {
+        "name": "v1",
+        "served": true,
+        "storage": true
+      },
+      {
+        "name": "v1beta1",
+        "served": true,
+        "storage": false
+      }
+    ]
+
+  }
+}
+
+### Send a crontab CRD
+POST http://localhost:8080/apis/apiextensions.k8s.io/v1/customresourcedefinitions
+Content-Type: application/json
+
+{
+  "apiVersion": "apiextensions.k8s.io/v1",
+  "kind": "CustomResourceDefinition",
+  "metadata": {
+    "annotations": {
+      "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"apiextensions.k8s.io/v1\",\"kind\":\"CustomResourceDefinition\",\"metadata\":{\"annotations\":{},\"name\":\"crontabs.stable.example.com\"},\"spec\":{\"group\":\"stable.example.com\",\"names\":{\"kind\":\"CronTab\",\"plural\":\"crontabs\",\"shortNames\":[\"ct\"],\"singular\":\"crontab\"},\"scope\":\"Namespaced\",\"versions\":[{\"name\":\"v1\",\"schema\":{\"openAPIV3Schema\":{\"properties\":{\"spec\":{\"properties\":{\"cronSpec\":{\"type\":\"string\"},\"image\":{\"type\":\"string\"},\"replicas\":{\"type\":\"integer\"}},\"type\":\"object\"}},\"type\":\"object\"}},\"served\":true,\"storage\":true}]}}\n"
+    },
+    "creationTimestamp": "2020-10-26T15:47:10Z",
+    "generation": 1,
+    "managedFields": [
+      {
+        "apiVersion": "apiextensions.k8s.io/v1",
+        "fieldsType": "FieldsV1",
+        "fieldsV1": {
+          "f:status": {
+            "f:acceptedNames": {
+              "f:kind": {},
+              "f:listKind": {},
+              "f:plural": {},
+              "f:shortNames": {},
+              "f:singular": {}
+            },
+            "f:conditions": {}
+          }
+        },
+        "manager": "kube-apiserver",
+        "operation": "Update",
+        "time": "2020-10-26T15:47:10Z"
+      },
+      {
+        "apiVersion": "apiextensions.k8s.io/v1",
+        "fieldsType": "FieldsV1",
+        "fieldsV1": {
+          "f:metadata": {
+            "f:annotations": {
+              ".": {},
+              "f:kubectl.kubernetes.io/last-applied-configuration": {}
+            }
+          },
+          "f:spec": {
+            "f:conversion": {
+              ".": {},
+              "f:strategy": {}
+            },
+            "f:group": {},
+            "f:names": {
+              "f:kind": {},
+              "f:listKind": {},
+              "f:plural": {},
+              "f:shortNames": {},
+              "f:singular": {}
+            },
+            "f:scope": {},
+            "f:versions": {}
+          },
+          "f:status": {
+            "f:storedVersions": {}
+          }
+        },
+        "manager": "kubectl-client-side-apply",
+        "operation": "Update",
+        "time": "2020-10-26T15:47:10Z"
+      }
+    ],
+    "name": "crontabs.stable.example.com",
+    "resourceVersion": "6438",
+    "uid": "e9e9ffed-6186-4fd3-b6eb-4e33e41fa0fa"
+  },
+  "spec": {
+    "conversion": {
+      "strategy": "None"
+    },
+    "group": "stable.example.com",
+    "names": {
+      "kind": "CronTab",
+      "listKind": "CronTabList",
+      "plural": "crontabs",
+      "shortNames": [
+        "ct"
+      ],
+      "singular": "crontab"
+    },
+    "scope": "Cluster",
+    "versions": [
+      {
+        "name": "v1",
+        "schema": {
+          "openAPIV3Schema": {
+            "properties": {
+              "spec": {
+                "properties": {
+                  "cronSpec": {
+                    "type": "string"
+                  },
+                  "image": {
+                    "type": "string"
+                  },
+                  "replicas": {
+                    "type": "integer"
+                  }
+                },
+                "type": "object"
+              }
+            },
+            "type": "object"
+          }
+        },
+        "served": true,
+        "storage": true
+      }
+    ]
+  }
+}
+
+
+###
+POST http://localhost:8080/apis/stable.example.com/v1/crontabs
+Content-Type: application/json
+
+            {
+            "apiVersion": "stable.example.com/v1",
+            "kind": "CronTab",
+            "metadata": {
+                "annotations": {
+                    "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"stable.example.com/v1\",\"kind\":\"CronTab\",\"metadata\":{\"annotations\":{},\"name\":\"my-new-cron-object\",\"namespace\":\"default\"},\"spec\":{\"cronSpec\":\"* * * * */5\",\"image\":\"my-awesome-cron-image\"}}\n"
+                },
+                "creationTimestamp": "2020-10-26T15:56:57Z",
+                "generation": 1,
+                "managedFields": [
+                    {
+                        "apiVersion": "stable.example.com/v1",
+                        "fieldsType": "FieldsV1",
+                        "fieldsV1": {
+                            "f:metadata": {
+                                "f:annotations": {
+                                    ".": {},
+                                    "f:kubectl.kubernetes.io/last-applied-configuration": {}
+                                }
+                            },
+                            "f:spec": {
+                                ".": {},
+                                "f:cronSpec": {},
+                                "f:image": {}
+                            }
+                        },
+                        "manager": "kubectl-client-side-apply",
+                        "operation": "Update",
+                        "time": "2020-10-26T15:56:57Z"
+                    }
+                ],
+                "name": "my-new-cron-object",
+                "namespace": "default",
+                "resourceVersion": "6499",
+                "uid": "c7be1511-b04b-4c73-9795-53e4d404bfe1"
+            },
+            "spec": {
+                "cronSpec": "* * * * */5",
+                "image": "my-awesome-cron-image"
+            }
+        }
+
+
+
+### Send a new resource
+POST http://localhost:8080/apis/apiextensions.k8s.io/v1/customresourcedefinitions
+Content-Type: application/json
+
+{
+  "metadata": {
+    "name": "customresourcedefinitions.apiextensions.k8s.io"
+  },
+  "spec": {
+    "group" : "apiextensions.k8s.io",
+    "names" : {
+      "plural": "customresourcedefinitions",
+      "singular": "",
+      "kind": "CustomResourceDefinition"
+    },
+    "scope": "Cluster",
+    "versions": [
+      {
+        "name": "v1",
+        "served": true,
+        "storage": true
+      },
+      {
+        "name": "v1beta1",
+        "served": true,
+        "storage": false
+      }
+    ]
+
+  }
+}
+
+### Start a watch - IntelliJ buffers the response, to see it on the command line run
+### curl -N  http://localhost:8080/apis/apiextensions.k8s.io/v1/customresourcedefinitions
+GET http://localhost:8080/apis/apiextensions.k8s.io/v1/customresourcedefinitions
+
+###
+GET http://localhost:8080/apis/stackable.com/v1/wazzup
+
+###
+POST http://localhost:8080/apis/stackable.com/v1/wazzup
+Content-Type: application/json
+
 {
   "metadata": {
     "name": "foobar"
@@ -18,6 +257,11 @@ Content-Type: application/json
   }
 }
 
-### Start a watch - IntelliJ buffers the response, to see it on the command line run
-### curl -N  http://localhost:8080/apis/apiextensions.k8s.io/v1/customresourcedefinitions
-GET http://localhost:8080/apis/apiextensions.k8s.io/v1/customresourcedefinitions
+###
+GET http://localhost:8080/api
+
+###
+GET http://localhost:8080/apis
+
+###
+GET http://localhost:8080/apis/stable.example.com/v1/crontabs
