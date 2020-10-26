@@ -5,7 +5,7 @@ pub struct OrchestratorConfig;
 impl OrchestratorConfig {
     pub const BIND_ADDRESS: ConfigOption = ConfigOption {
         name: "bind-address",
-        default: "localhost",
+        default: "0.0.0.0",
         required: false,
         takes_argument: true,
         help: "The address to bind to",

@@ -1,4 +1,4 @@
-use crate::crd::CustomResource;
+use crate::crd::Resource;
 
 use std::pin::Pin;
 use std::sync::mpsc::{Receiver, Sender};
@@ -16,7 +16,7 @@ use serde::Serialize;
 #[derive(Clone, Debug, Serialize)]
 #[serde(tag = "type", content = "object", rename_all = "UPPERCASE")]
 pub enum WatchEvent {
-    ADDED(CustomResource),
+    ADDED(Resource),
 }
 
 // This is the struct that will get notified about new events
