@@ -1,10 +1,19 @@
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{APIGroupList, APIGroup, GroupVersionForDiscovery, APIVersions, ServerAddressByClientCIDR, APIResourceList, APIResource};
 use actix_web::{get, HttpResponse, Responder, web};
 use crate::storage_sqlite::SqliteStorage;
-use crate::storage::{Storage, StorageResourceType};
+use crate::storage::{Storage, StorageKind};
 use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
 
 // TODO: All APIs probably need to return a kind: Status / 404 instead of empty lists when something doesn't exist
+// TODO: Do we also need /apis/{group} ? kubectl works without it but it'd be good to have for compatibility anyway
+
+// TODO: I'd love to make this a const but that doesn't work with Strings. We'd need to accept &str for that to work
+fn get_crd_kind() -> StorageKind {
+    StorageKind::ClusterScoped {
+        group: "apiextensions.k8s.io".to_string(),
+        kind: "customresourcedefinitions".to_string(),
+    }
+}
 
 
 #[get("/api")]
@@ -24,19 +33,14 @@ pub async fn get_api_versions() -> impl Responder {
 pub async fn list_api_groups(
     storage: web::Data<SqliteStorage>,
 ) -> impl Responder {
-    // TODO: I'd love to make this a const but that doesn't work with Strings. We'd need to accept &str for that to work
-    let key = StorageResourceType::ClusterScoped {
-        group: "apiextensions.k8s.io".to_string(),
-        name: "customresourcedefinitions".to_string(),
-    };
+    let crds: Vec<CustomResourceDefinition> = storage.list(&get_crd_kind());
 
-    let resources: Vec<CustomResourceDefinition> = storage.list(&key);
-    let mut groups = Vec::with_capacity(resources.len());
+    let mut groups = Vec::with_capacity(crds.len());
     // Iterate over each API Group and for each group iterate over its versions to create the final document
-    for resource in resources {
-        let mut group_versions = Vec::with_capacity(resource.spec.versions.len());
-        for version in resource.spec.versions {
-            let group_version = format!("{}/{}", resource.spec.group, version.name);
+    for crd in crds {
+        let mut group_versions = Vec::with_capacity(crd.spec.versions.len());
+        for version in crd.spec.versions {
+            let group_version = format!("{}/{}", crd.spec.group, version.name);
 
             group_versions.push(GroupVersionForDiscovery {
                 group_version,
@@ -45,7 +49,7 @@ pub async fn list_api_groups(
         }
 
         let group = APIGroup {
-            name: resource.spec.group,
+            name: crd.spec.group,
             preferred_version: Some(GroupVersionForDiscovery { group_version: group_versions.get(0).unwrap().group_version.clone(), version: group_versions.get(0).unwrap().version.clone() }),
             server_address_by_client_cidrs: None,
             versions: group_versions,
@@ -60,26 +64,18 @@ pub async fn list_api_groups(
     HttpResponse::Ok().json(api_group_list)
 }
 
-// TODO: Do we also need /apis/{group} ? kubectl works without it but it'd be good to have for compatibility anyway
 
-
-#[get("/apis/{api_group}/{api_version}")]
+#[get("/apis/{group}/{version}")]
 pub async fn list_resource_types(
-    web::Path((api_group, api_version)): web::Path<(String, String)>,
+    web::Path((group, version)): web::Path<(String, String)>,
     storage: web::Data<SqliteStorage>,
 ) -> impl Responder {
+    let crds: Vec<CustomResourceDefinition> = storage.list(&get_crd_kind());
 
-    // TODO: I'd love to make this a const but that doesn't work with Strings. We'd need to accept &str for that to work
-    let key = StorageResourceType::ClusterScoped {
-        group: "apiextensions.k8s.io".to_string(),
-        name: "customresourcedefinitions".to_string(),
-    };
-    let crds: Vec<CustomResourceDefinition> = storage.list(&key);
-
-    let group_version = format!("{}/{}", api_group, api_version);
+    let group_version = format!("{}/{}", group, version);
     let api_resources: Vec<APIResource> = crds.iter()
-        .filter(|&crd| crd.spec.group == api_group)
-        .filter(|&crd| crd.spec.versions.iter().any(|version| version.name == api_version))
+        .filter(|&crd| crd.spec.group == group)
+        .filter(|&crd| crd.spec.versions.iter().any(|crd_version| crd_version.name == version))
         .map(|crd| APIResource {
             categories: crd.spec.names.categories.clone(),
             group: None, // Empty implies the group of the containing resource list.

@@ -265,3 +265,7 @@ GET http://localhost:8080/apis
 
 ###
 GET http://localhost:8080/apis/stable.example.com/v1/crontabs
+
+
+###
+GET http://localhost:8080/apis/stable.example.com/v1/crontabs/my-new-cron-object

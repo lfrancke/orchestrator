@@ -1,12 +1,13 @@
 mod api;
 mod config;
 mod crd;
+mod models;
 mod storage;
 mod storage_sqlite;
 mod watch;
 
 use crate::config::OrchestratorConfig;
-use crate::crd::{create_cluster_scoped_resource, list_cluster_scoped_resource_type};
+use crate::crd::{create_cluster_scoped_resource, list_cluster_scoped_resource_type, get_cluster_scoped_resource};
 use crate::watch::{EventBroker, WatchEvent};
 
 use std::sync::mpsc::{Sender, Receiver};
@@ -67,12 +68,16 @@ async fn main() -> std::io::Result<()> {
         // which would take ownership of the data (e.g. `data(...)`.
         // Because this closure is a `Fn` (and not a `FnOnce`) and could be called multiple times
         // we cannot move _out_ these variables multiple times.
-        // That means each _thing_ needs to be either `Copy` or we need to clone it.
-        // Actix wraps everything passed to `data` in an Arc automatically!
+        // That means each _thing_ needs to be either `Copy`, we need to clone it or we construct a
+        // new instance within this closure because that _can_ then be moved out.
+        // Actix wraps everything passed to `data` in an Arc automatically which means that the data
+        // does not need to be `Clone` itself.
         App::new()
+
             .data(storage.clone())
             .data(reg_tx.clone())
             .data(evt_tx.clone())
+
             //.data(registered_crds.clone())
 
             .wrap(Logger::default())
@@ -83,8 +88,10 @@ async fn main() -> std::io::Result<()> {
             .service(get_api_versions)
             .service(list_resource_types)
 
-            .service(list_cluster_scoped_resource_type) // It is important that this be added _after_ the more specific ones because this catches everything that begins with /apis
-            .service(create_cluster_scoped_resource) // It is important that this be added _after_ the more specific ones because this catches everything that begins with /apis
+            // It is important that the following routes be added _after_ the more specific ones because this catches everything that begins with /apis
+            .service(list_cluster_scoped_resource_type)
+            .service(create_cluster_scoped_resource)
+            .service(get_cluster_scoped_resource)
     })
         .bind(format!("{}:{}", bind_address, bind_port))
         .expect(format!("Can't bind to {}:{}", bind_address, bind_port).as_str())

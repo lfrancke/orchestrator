@@ -1,4 +1,4 @@
-use crate::crd::Resource;
+use crate::models::Resource;
 
 use std::pin::Pin;
 use std::sync::mpsc::{Receiver, Sender};
@@ -10,6 +10,7 @@ use actix_web::Error;
 use bytes::Bytes;
 use futures::Stream;
 use serde::Serialize;
+
 
 /// Variants of this enum will be returned for all _watch_ requests.
 /// Kubernetes has the additional BOOKMARK and ERROR Types which are not implemented here yet.
