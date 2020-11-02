@@ -26,5 +26,6 @@ rusqlite = "0.24"
 serde = "1.0"
 serde_json = "1.0"
 stackable_config = { version = "0.1", path = "../stackable-common/config" }
+thiserror = "1.0"
 
 #stackable_logging = { version = "0.1", path="../stackable-common/logging" }

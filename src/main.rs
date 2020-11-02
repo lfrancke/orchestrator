@@ -1,13 +1,13 @@
-mod api;
+mod k8s_api;
 mod config;
-mod crd;
+mod resource_api;
 mod models;
 mod storage;
 mod storage_sqlite;
 mod watch;
 
 use crate::config::OrchestratorConfig;
-use crate::crd::{create_cluster_scoped_resource, list_cluster_scoped_resource_type, get_cluster_scoped_resource};
+use crate::resource_api::{create_cluster_resource, list_cluster_resources, get_cluster_resource, get_namespaced_resource};
 use crate::watch::{EventBroker, WatchEvent};
 
 use std::sync::mpsc::{Sender, Receiver};
@@ -17,7 +17,7 @@ use std::{env, thread};
 use actix_web::{get, middleware::Logger, App, HttpRequest, HttpResponse, HttpServer, Responder};
 use stackable_config::get_matcher;
 use storage_sqlite::SqliteStorage;
-use crate::api::{list_api_groups, get_api_versions, list_resource_types};
+use crate::k8s_api::{list_api_groups, get_api_versions, list_resource_types};
 
 
 #[actix_web::main]
@@ -89,9 +89,10 @@ async fn main() -> std::io::Result<()> {
             .service(list_resource_types)
 
             // It is important that the following routes be added _after_ the more specific ones because this catches everything that begins with /apis
-            .service(list_cluster_scoped_resource_type)
-            .service(create_cluster_scoped_resource)
-            .service(get_cluster_scoped_resource)
+            .service(list_cluster_resources)
+            .service(create_cluster_resource)
+            .service(get_cluster_resource)
+            .service(get_namespaced_resource)
     })
         .bind(format!("{}:{}", bind_address, bind_port))
         .expect(format!("Can't bind to {}:{}", bind_address, bind_port).as_str())

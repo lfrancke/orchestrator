@@ -6,53 +6,85 @@ use serde::{Deserialize, Serialize};
 // * Deserialize is needed for Actix to work when the struct is used in an Extractor
 
 
-#[derive(Debug)]
+#[derive(Debug, Deserialize)]
 pub struct GroupKind {
-    group: String,
-    kind: String
+    pub group: String,
+    pub kind: String
 }
 
+impl From<GroupVersionKind> for GroupKind {
+    fn from(gvk: GroupVersionKind) -> Self {
+        GroupKind {
+            group: gvk.group,
+            kind: gvk.kind
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
 pub struct GroupNamespaceKind {
-    group_kind: GroupKind,
-    namespace: String
+    #[serde(flatten)]
+    pub group_kind: GroupKind,
+    pub namespace: String
 }
 
 
-#[derive(Deserialize, Debug)]
+
+#[derive(Debug, Deserialize)]
 pub struct GroupVersionKind {
-    group: String,
-    version: String,
-    kind: String,
+    pub group: String,
+    pub version: String,
+    pub kind: String,
 }
 
 impl GroupVersionKind {
-    fn group_version(&self) -> String {
+    pub fn group_version(&self) -> String {
         format!("{}/{}", self.group, self.version)
     }
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Debug, Deserialize)]
 pub struct GroupVersionNamespaceKind {
     #[serde(flatten)]
-    group_version_kind: GroupVersionKind,
-    namespace: String
+    pub group_version_kind: GroupVersionKind,
+    pub namespace: String
 }
-
 
 #[derive(Debug, Deserialize)]
 pub struct ClusterResource {
     #[serde(flatten)]
-    group_version_kind: GroupVersionKind,
-    resource: String
+    pub group_kind: GroupKind,
+    pub resource: String
 }
 
-#[derive(Clone, Deserialize, Debug, Eq, Hash, PartialEq)]
-pub struct NamespaceResource {
-    api_group: String,
-    api_version: String,
-    namespace: String,
-    resource_type_name: String,
+impl ClusterResource {
+    pub fn new(group: String, kind: String, resource: String) -> ClusterResource {
+        ClusterResource {
+            group_kind: GroupKind {
+                group,
+                kind
+            },
+            resource
+        }
+    }
 }
+
+impl From<(GroupKind, String)> for ClusterResource {
+    fn from(incoming: (GroupKind, String)) -> Self {
+        ClusterResource {
+            group_kind: incoming.0,
+            resource: incoming.1
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct NamespaceResource {
+    #[serde(flatten)]
+    pub group_namespace_kind: GroupNamespaceKind,
+    pub resource: String
+}
+
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Resource {

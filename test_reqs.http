@@ -269,3 +269,6 @@ GET http://localhost:8080/apis/stable.example.com/v1/crontabs
 
 ###
 GET http://localhost:8080/apis/stable.example.com/v1/crontabs/my-new-cron-object
+
+###
+GET http://localhost:8080/apis/stable.example.com/v1/namespaces/my-namespace/crontabs/my-new-cron-object
