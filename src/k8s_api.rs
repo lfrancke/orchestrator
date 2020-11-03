@@ -10,10 +10,7 @@ use crate::models::GroupKind;
 
 // TODO: I'd love to make this a const but that doesn't work with Strings. We'd need to accept &str for that to work
 fn get_crd_kind() -> GroupKind {
-    GroupKind {
-        group: "apiextensions.k8s.io".to_string(),
-        kind: "customresourcedefinitions".to_string(),
-    }
+    GroupKind::new("apiextensions.k8s.io".to_string(), "customresourcedefinitions".to_string())
 }
 
 
