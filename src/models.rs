@@ -7,180 +7,180 @@ use serde::{Deserialize, Serialize};
 pub trait Group {
     fn group(&self) -> &str;
 }
-pub trait Kind {
-    fn kind(&self) -> &str;
-}
 pub trait Namespace {
     fn namespace(&self) -> &str;
 }
 pub trait Version {
     fn version(&self) -> &str;
 }
+pub trait ResourceType {
+    fn resource_type(&self) -> &str;
+}
 pub trait Resource {
     fn resource(&self) -> &str;
 }
 
 //
-// GroupKind
+// GroupResourceType
 //
 #[derive(Debug, Deserialize)]
-pub struct GroupKind {
+pub struct GroupResourceType {
     group: String,
-    kind: String
+    resource_type: String
 }
 
-impl GroupKind {
-    pub fn new(group: String, kind: String) -> GroupKind {
-        GroupKind {
+impl GroupResourceType {
+    pub fn new(group: String, resource_type: String) -> GroupResourceType {
+        GroupResourceType {
             group,
-            kind
+            resource_type
         }
     }
 }
 
-impl Group for GroupKind {
+impl Group for GroupResourceType {
     fn group(&self) -> &str {
         &self.group
     }
 }
-impl Kind for GroupKind {
-    fn kind(&self) -> &str {
-        &self.kind
+impl ResourceType for GroupResourceType {
+    fn resource_type(&self) -> &str {
+        &self.resource_type
     }
 }
 
 
-impl From<GroupVersionKind> for GroupKind {
-    fn from(gvk: GroupVersionKind) -> Self {
-        GroupKind {
+impl From<GroupVersionResourceType> for GroupResourceType {
+    fn from(gvk: GroupVersionResourceType) -> Self {
+        GroupResourceType {
             group: gvk.group,
-            kind: gvk.kind
+            resource_type: gvk.resource_type
         }
     }
 }
 
 //
-// GroupKindResource
+// GroupResourceTypeResource
 //
 #[derive(Debug, Deserialize)]
-pub struct GroupKindResource {
+pub struct GroupResourceTypeResource {
     group: String,
-    kind: String,
+    resource_type: String,
     resource: String
 }
 
-impl GroupKindResource {
-    pub fn new(group: String, kind: String, resource: String) -> GroupKindResource {
-        GroupKindResource {
+impl GroupResourceTypeResource {
+    pub fn new(group: String, resource_type: String, resource: String) -> GroupResourceTypeResource {
+        GroupResourceTypeResource {
             group,
-            kind,
+            resource_type,
             resource
         }
     }
 }
 
-impl Group for GroupKindResource {
+impl Group for GroupResourceTypeResource {
     fn group(&self) -> &str {
         &self.group
     }
 }
-impl Kind for GroupKindResource {
-    fn kind(&self) -> &str {
-        &self.kind
+impl ResourceType for GroupResourceTypeResource {
+    fn resource_type(&self) -> &str {
+        &self.resource_type
     }
 }
-impl Resource for GroupKindResource {
+impl Resource for GroupResourceTypeResource {
     fn resource(&self) -> &str {
         &self.resource
     }
 }
 
 //
-// GroupNamespaceKind
+// GroupNamespaceResourceType
 //
 #[derive(Debug, Deserialize)]
-pub struct GroupNamespaceKind {
+pub struct GroupNamespaceResourceType {
     group: String,
     namespace: String,
-    kind: String
+    resource_type: String
 }
 
-impl Group for GroupNamespaceKind {
+impl Group for GroupNamespaceResourceType {
     fn group(&self) -> &str {
         &self.group
     }
 }
-impl Namespace for GroupNamespaceKind {
+impl Namespace for GroupNamespaceResourceType {
     fn namespace(&self) -> &str {
         &self.namespace
     }
 }
-impl Kind for GroupNamespaceKind {
-    fn kind(&self) -> &str {
-        &self.kind
+impl ResourceType for GroupNamespaceResourceType {
+    fn resource_type(&self) -> &str {
+        &self.resource_type
     }
 }
 
 
 //
-// GroupVersionKind
+// GroupVersionResourceType
 //
 #[derive(Debug, Deserialize)]
-pub struct GroupVersionKind {
+pub struct GroupVersionResourceType {
     group: String,
     version: String,
-    kind: String,
+    resource_type: String,
 }
 
-impl Group for GroupVersionKind {
+impl Group for GroupVersionResourceType {
     fn group(&self) -> &str {
         &self.group
     }
 }
-impl Version for GroupVersionKind {
+impl Version for GroupVersionResourceType {
     fn version(&self) -> &str {
         &self.version
     }
 }
-impl Kind for GroupVersionKind {
-    fn kind(&self) -> &str {
-        &self.kind
+impl ResourceType for GroupVersionResourceType {
+    fn resource_type(&self) -> &str {
+        &self.resource_type
     }
 }
 
-impl GroupVersionKind {
+impl GroupVersionResourceType {
     pub fn group_version(&self) -> String {
         format!("{}/{}", self.group, self.version)
     }
 }
 
 //
-// GroupNamespaceKindResource
+// GroupNamespaceResourceTypeResource
 //
 #[derive(Debug, Deserialize)]
-pub struct GroupNamespaceKindResource {
+pub struct GroupNamespaceResourceTypeResource {
     group: String,
     namespace: String,
-    kind: String,
+    resource_type: String,
     resource: String
 }
 
-impl Group for GroupNamespaceKindResource {
+impl Group for GroupNamespaceResourceTypeResource {
     fn group(&self) -> &str {
         &self.group
     }
 }
-impl Namespace for GroupNamespaceKindResource {
+impl Namespace for GroupNamespaceResourceTypeResource {
     fn namespace(&self) -> &str {
         &self.namespace
     }
 }
-impl Kind for GroupNamespaceKindResource {
-    fn kind(&self) -> &str {
-        &self.kind
+impl ResourceType for GroupNamespaceResourceTypeResource {
+    fn resource_type(&self) -> &str {
+        &self.resource_type
     }
 }
-impl Resource for GroupNamespaceKindResource {
+impl Resource for GroupNamespaceResourceTypeResource {
     fn resource(&self) -> &str {
         &self.resource
     }
@@ -188,106 +188,113 @@ impl Resource for GroupNamespaceKindResource {
 
 
 //
-// GroupVersionNamespaceKind
+// GroupVersionNamespaceResourceType
 //
 #[derive(Debug, Deserialize)]
-pub struct GroupVersionNamespaceKind {
+pub struct GroupVersionNamespaceResourceType {
     group: String,
     version: String,
     namespace: String,
-    kind: String
+    resource_type: String
 }
 
-impl Group for GroupVersionNamespaceKind {
+impl GroupVersionNamespaceResourceType {
+    pub fn group_version(&self) -> String {
+        format!("{}/{}", self.group, self.version)
+    }
+}
+
+impl Group for GroupVersionNamespaceResourceType {
     fn group(&self) -> &str {
         &self.group
     }
 }
-impl Version for GroupVersionNamespaceKind {
+impl Version for GroupVersionNamespaceResourceType {
     fn version(&self) -> &str {
         &self.version
     }
 }
-impl Namespace for GroupVersionNamespaceKind {
+impl Namespace for GroupVersionNamespaceResourceType {
     fn namespace(&self) -> &str {
         &self.namespace
     }
 }
-impl Kind for GroupVersionNamespaceKind {
-    fn kind(&self) -> &str {
-        &self.kind
+impl ResourceType for GroupVersionNamespaceResourceType {
+    fn resource_type(&self) -> &str {
+        &self.resource_type
     }
 }
 
 //
-// GroupVersionKindResource
+// GroupVersionResourceTypeResource
 //
 #[derive(Debug, Deserialize)]
-pub struct GroupVersionKindResource {
+pub struct GroupVersionResourceTypeResource {
     group: String,
     version: String,
-    kind: String,
+    resource_type: String,
     resource: String
 }
 
-impl Group for GroupVersionKindResource {
+impl Group for GroupVersionResourceTypeResource {
     fn group(&self) -> &str {
         &self.group
     }
 }
-impl Version for GroupVersionKindResource {
+impl Version for GroupVersionResourceTypeResource {
     fn version(&self) -> &str {
         &self.version
     }
 }
-impl Kind for GroupVersionKindResource {
-    fn kind(&self) -> &str {
-        &self.kind
+impl ResourceType for GroupVersionResourceTypeResource {
+    fn resource_type(&self) -> &str {
+        &self.resource_type
     }
 }
-impl Resource for GroupVersionKindResource {
+impl Resource for GroupVersionResourceTypeResource {
     fn resource(&self) -> &str {
         &self.resource
     }
 }
 
 //
-// GroupVersionNamespaceKindResource
+// GroupVersionNamespaceResourceTypeResource
 //
 #[derive(Debug, Deserialize)]
-pub struct GroupVersionNamespaceKindResource {
+pub struct GroupVersionNamespaceResourceTypeResource {
     group: String,
     version: String,
     namespace: String,
-    kind: String,
+    resource_type: String,
     resource: String
 }
 
-impl Group for GroupVersionNamespaceKindResource {
+impl Group for GroupVersionNamespaceResourceTypeResource {
     fn group(&self) -> &str {
         &self.group
     }
 }
-impl Version for GroupVersionNamespaceKindResource {
+impl Version for GroupVersionNamespaceResourceTypeResource {
     fn version(&self) -> &str {
         &self.version
     }
 }
-impl Namespace for GroupVersionNamespaceKindResource {
+impl Namespace for GroupVersionNamespaceResourceTypeResource {
     fn namespace(&self) -> &str {
         &self.namespace
     }
 }
-impl Kind for GroupVersionNamespaceKindResource {
-    fn kind(&self) -> &str {
-        &self.kind
+impl ResourceType for GroupVersionNamespaceResourceTypeResource {
+    fn resource_type(&self) -> &str {
+        &self.resource_type
     }
 }
-impl Resource for GroupVersionNamespaceKindResource {
+impl Resource for GroupVersionNamespaceResourceTypeResource {
     fn resource(&self) -> &str {
         &self.resource
     }
 }
+
 
 
 
@@ -353,25 +360,3 @@ pub struct List<T> {
 pub struct ListOptions {
     watch: bool
 }
-
-/*
-impl From<GroupVersionKind> for StorageKind {
-    fn from(item: GroupVersionKind) -> Self {
-        StorageKind::ClusterScoped {
-            group: item.group,
-            kind: item.kind,
-        }
-    }
-}
-
-impl From<ClusterResource> for StorageKind {
-    fn from(item: ClusterResource) -> Self {
-        StorageKind::ClusterScoped {
-            group: item.group_version_kind.group,
-            kind: item.group_version_kind.kind,
-        }
-    }
-}
-
-
- */

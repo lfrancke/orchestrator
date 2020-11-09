@@ -1,4 +1,4 @@
-use crate::models::{GroupVersionKind, List, BaseResource, GroupKind, Group, Kind, GroupKindResource, GroupVersionKindResource, GroupVersionNamespaceKindResource};
+use crate::models::{GroupVersionResourceType, List, BaseResource, GroupResourceType, Group, GroupResourceTypeResource, GroupVersionResourceTypeResource, GroupVersionNamespaceResourceTypeResource, GroupVersionNamespaceResourceType, ResourceType, Version};
 use crate::storage::{Storage, StorageResult};
 use crate::storage_sqlite::SqliteStorage;
 
@@ -6,6 +6,7 @@ use actix_web::{get, HttpResponse, web, post, Error};
 use actix_web::error::{ErrorNotFound, ErrorBadRequest};
 use bytes::Buf;
 use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
+use crate::helper::{get_crd_for_resource, get_crd_resource_type};
 
 
 /*
@@ -38,31 +39,83 @@ pub async fn list_custom_resource_definitions(
 
 
 
-fn get_api<T>(resource_type: &T, storage: &web::Data<SqliteStorage>) -> StorageResult<CustomResourceDefinition>
-where T: Group + Kind
-{
-    let resource_name = format!("{}.{}", resource_type.kind(), resource_type.group());
-    let key = GroupKindResource::new("apiextensions.k8s.io".to_string(), "customresourcedefinitions".to_string(), resource_name);
 
-    storage.get_cluster_resource(&key)
+// TODO: Make this return an Actix Error
+fn get_crd_object<T>(crd: &T, storage: &web::Data<SqliteStorage>) -> StorageResult<CustomResourceDefinition>
+    where T: Group + ResourceType + Version
+{
+    // The "name" of a CRD is its resource type and group separated by a dot.
+    let resource_name = format!("{}.{}", crd.resource_type(), crd.group());
+    let key = get_crd_for_resource(resource_name);
+
+    let result: Option<CustomResourceDefinition> = storage.get_cluster_resource(&key)?;
+    match result {
+        None => { Ok(None) }
+        Some(storage_crd) => {
+            if storage_crd.spec.versions.iter().any(|crd_version| crd_version.name == crd.version()) {
+                Ok(Some(storage_crd))
+            } else {
+                Ok(None)
+            }
+        }
+    }
+}
+
+
+//
+// CRD APIs
+//
+#[get("/apis/apiextensions.k8s.io/v1/customresourcedefinitions/{resource}")]
+pub async fn get_crd(
+    resource: web::Path<String>,
+    storage: web::Data<SqliteStorage>,
+) -> Result<HttpResponse, Error> {
+    let crd = get_crd_for_resource(resource.into_inner());
+    let option: StorageResult<BaseResource> = storage.get_cluster_resource(&crd);
+    Ok(HttpResponse::Ok().json(option.unwrap()))
+}
+
+#[get("/apis/apiextensions.k8s.io/v1/customresourcedefinitions")]
+pub async fn list_crds(
+    storage: web::Data<SqliteStorage>,
+) -> Result<HttpResponse, Error> {
+    let resources_list: List<CustomResourceDefinition> = List {
+        api_version: "apiextensions.k8s.io/v1".to_string(),
+        items: storage.list_cluster_resources(&get_crd_resource_type()),
+        kind: "CustomResourceDefinition".to_string(),
+        metadata: Default::default(),
+    };
+    Ok(HttpResponse::Ok().json(resources_list))
+}
+
+#[post("/apis/apiextensions.k8s.io/v1/customresourcedefinitions")]
+pub async fn create_crd(
+    storage: web::Data<SqliteStorage>,
+    bytes: web::Bytes,
+    //event_sender: web::Data<Sender<WatchEvent>>,
+    //registered_crds: web::Data<Arc<RwLock<HashSet<CrdCoordinates>>>>,
+) -> Result<HttpResponse, Error> {
+    let resource: BaseResource = serde_json::from_slice(bytes.bytes())?;
+
+    let crd = get_crd_for_resource(resource.metadata.name.ok_or(ErrorBadRequest("metadata.name is empty".to_string()))?.clone());
+    storage.create_cluster_resource(&crd, bytes.bytes());
+
+    Ok(HttpResponse::Ok().finish())
 }
 
 
 //
 // Cluster Scoped Handlers
 //
-#[get("/apis/{group}/{version}/{kind}/{resource}")]
+#[get("/apis/{group}/{version}/{resource_type}/{resource}")]
 pub async fn get_cluster_resource(
-    resource: web::Path<GroupVersionKindResource>,
+    resource: web::Path<GroupVersionResourceTypeResource>,
     storage: web::Data<SqliteStorage>,
-    //event_sender: web::Data<Sender<WatchEvent>>,
-    //registered_crds: web::Data<Arc<RwLock<HashSet<CrdCoordinates>>>>,
 ) -> Result<HttpResponse, Error> {
-    println!("get_cluster_scoped_resource: {:?}", resource);
+    println!("get_cluster_resource: {:?}", resource);
     let resource = resource.into_inner();
-    // TODO: Check whether the requested API has been registered
 
-    let crd = get_api(&resource, &storage)
+    let crd = get_crd_object(&resource, &storage)
         .map_err(|e| ErrorBadRequest(e))?
         .ok_or(ErrorNotFound("API does not exist"))?;
 
@@ -73,25 +126,21 @@ pub async fn get_cluster_resource(
 
 
 /// This function handles all GET (LIST) requests for resources that are Cluster scoped.
-#[get("/apis/{group}/{version}/{kind}")]
+#[get("/apis/{group}/{version}/{resource_type}")]
 pub async fn list_cluster_resources(
-    gvk: web::Path<GroupVersionKind>,
+    gvrt: web::Path<GroupVersionResourceType>,
     storage: web::Data<SqliteStorage>,
 ) -> Result<HttpResponse, Error> {
-    println!("list_cluster_scoped_resource_type: {:?}", gvk); // TODO: Logging
-    let gvk = gvk.into_inner();
+    println!("list_cluster_scoped_resource_type: {:?}", gvrt); // TODO: Logging
+    let gvrt = gvrt.into_inner();
 
-    // First we need to check whether the requested API exists at all
-    let group_version = gvk.group_version();
-    let gk = GroupKind::from(gvk);
-
-    let crd = get_api(&gk, &storage)
+    let crd = get_crd_object(&gvrt, &storage)
         .map_err(|e| ErrorBadRequest(e))?
-        .ok_or(ErrorNotFound("foo"))?;
+        .ok_or(ErrorNotFound("API does not exist"))?;
 
     let resources_list: List<BaseResource> = List {
-        api_version: group_version,
-        items: storage.list_cluster_resources(&gk),
+        api_version: gvrt.group_version(),
+        items: storage.list_cluster_resources(&gvrt),
         kind: crd.spec.names.kind,
         metadata: Default::default(),
     };
@@ -100,28 +149,28 @@ pub async fn list_cluster_resources(
 
 
 // TODO: We need to validate the JSON to see whether names etc. are all valid URLs
-#[post("/apis/{group}/{version}/{kind}")]
+#[post("/apis/{group}/{version}/{resource_type}")]
 pub async fn create_cluster_resource(
-    gvk: web::Path<GroupVersionKind>,
+    web::Path(gvrt): web::Path<GroupVersionResourceType>,
     storage: web::Data<SqliteStorage>,
     bytes: web::Bytes,
     //event_sender: web::Data<Sender<WatchEvent>>,
     //registered_crds: web::Data<Arc<RwLock<HashSet<CrdCoordinates>>>>,
 ) -> Result<HttpResponse, Error> {
-    println!("create_cluster_scoped_resource: {:?}", gvk);
-    let gvk = gvk.into_inner();
+    println!("create_cluster_resource: {:?}", gvrt);
 
-    let gk = GroupKind::from(gvk);
-    let crd = get_api(&gk, &storage) // TOOD: Move the error handling to the get_api method
+    let crd = get_crd_object(&gvrt, &storage)
         .map_err(|e| ErrorBadRequest(e))?
-        .ok_or(ErrorNotFound("CRD missing"))?;
+        .ok_or(ErrorNotFound("API does not exist"))?;
 
-
-    let byte_array = bytes.bytes();
-    let resource: BaseResource = serde_json::from_slice(byte_array)?;
+    let resource: BaseResource = serde_json::from_slice(bytes.bytes())?;
     // We clone the name here because we need the resource later on for sending it to the event bus
-    let cluster_resource = GroupKindResource::new(gk.group().to_string(), gk.kind().to_string(), resource.metadata.name.ok_or(ErrorBadRequest("metadata.name is empty".to_string()))?.clone());
-    storage.create_cluster_resource(&cluster_resource, byte_array);
+    let cluster_resource = GroupResourceTypeResource::new(
+        gvrt.group().to_string(),
+        gvrt.resource_type().to_string(),
+        resource.metadata.name.ok_or(ErrorBadRequest("metadata.name is empty".to_string()))?.clone(),
+    );
+    storage.create_cluster_resource(&cluster_resource, bytes.bytes());
 
     Ok(HttpResponse::Ok().finish())
 
@@ -134,23 +183,21 @@ pub async fn create_cluster_resource(
 }
 
 
-
 //
 // Namespace Scoped Handlers
 //
 
-#[get("/apis/{group}/{version}/namespaces/{namespace}/{kind}/{resource}")]
+#[get("/apis/{group}/{version}/namespaces/{namespace}/{resource_type}/{resource}")]
 pub async fn get_namespaced_resource(
-    resource: web::Path<GroupVersionNamespaceKindResource>,
+    web::Path(resource): web::Path<GroupVersionNamespaceResourceTypeResource>,
     storage: web::Data<SqliteStorage>,
     //event_sender: web::Data<Sender<WatchEvent>>,
     //registered_crds: web::Data<Arc<RwLock<HashSet<CrdCoordinates>>>>,
 ) -> Result<HttpResponse, Error> {
     println!("get_namespaced_resource: {:?}", resource);
-    let resource = resource.into_inner();
 
     // TODO: Check whether the requested API has been registered
-    let crd = get_api(&resource, &storage)
+    let crd = get_crd_object(&resource, &storage)
         .map_err(|e| ErrorBadRequest(e))?
         .ok_or(ErrorNotFound("API does not exist"))?;
 
@@ -160,76 +207,26 @@ pub async fn get_namespaced_resource(
 }
 
 
-/*
 /// This function handles all GET (LIST) requests for resources that are Namespace scoped.
-#[get("/apis/{group}/{version}/namespaces/{namespace}/{kind}")]
-pub async fn list_namespace_scoped_kind(
-    gvnk: web::Path<GroupVersionNamespaceKind>,
+#[get("/apis/{group}/{version}/namespaces/{namespace}/{resource_type}")]
+pub async fn list_namespaced_resources(
+    gvnrt: web::Path<GroupVersionNamespaceResourceType>,
     storage: web::Data<SqliteStorage>,
 ) -> Result<HttpResponse, Error> {
-    println!("list_namespace_scoped_kind {:?}", gvnk); // TODO: Logging
+    println!("list_namespaced_resources {:?}", gvnrt); // TODO: Logging
+    let gvnk = gvnrt.into_inner();
 
-    let gvnk = gvnk.into_inner();
+    let crd = get_crd_object(&gvnk, &storage)
+        .map_err(|e| ErrorBadRequest(e))?
+        .ok_or(ErrorNotFound("API does not exist"))?;
 
-    let crd = get_api(&gvnk.group_version_kind, &storage).ok_or(ErrorNotFound("foo"))?;
+    let items = storage.list_namespace_resources(&gvnk).unwrap().unwrap();
 
-    let resources_list: List<Resource> = List {
-        api_version: gvnk.group_version_kind.group_version(),
-        items: storage.list_namespaced(&::from(gvnk)),
+    let resources_list: List<BaseResource> = List {
+        api_version: gvnk.group_version(),
+        items,
         kind: crd.spec.names.kind,
         metadata: Default::default(),
     };
     Ok(HttpResponse::Ok().json(resources_list))
 }
-   */
-/*
-// TODO: We need to validate the JSON to see whether names etc. are all valid URLs
-#[post("/apis/{group}/{version}/{kind}")]
-pub async fn create_cluster_scoped_resource(
-    gvk: web::Path<GroupVersionKind>,
-    storage: web::Data<SqliteStorage>,
-    bytes: web::Bytes,
-    //event_sender: web::Data<Sender<WatchEvent>>,
-    //registered_crds: web::Data<Arc<RwLock<HashSet<CrdCoordinates>>>>,
-) -> Result<HttpResponse, Error> {
-    println!("create_cluster_scoped_resource: {:?}", gvk);
-    let gvk = gvk.into_inner();
-
-    let crd = get_api(&gvk, &storage).ok_or(ErrorNotFound("Crd missing"))?;
-
-    let byte_array = bytes.bytes();
-    let resource: Resource = serde_json::from_slice(byte_array)?;
-    // We clone the name here because we need the resource later on for sending it to the event bus
-    storage.create(&StorageKind::from(gvk), resource.metadata.name.clone().unwrap(), byte_array);
-
-    Ok(HttpResponse::Ok().finish())
-
-    /*
-    if !registered_crds.read().unwrap().contains(&coordinates) {
-        return Ok(HttpResponse::NotFound().finish());
-    }
-    event_sender.send(WatchEvent::ADDED(crd));
-     */
-}
-
-// TODO: Finish
-#[get("/apis/{group}/{version}/{kind}/{resource}")]
-pub async fn get_cluster_scoped_resource(
-    resource: web::Path<ClusterResource>,
-    storage: web::Data<SqliteStorage>,
-    //event_sender: web::Data<Sender<WatchEvent>>,
-    //registered_crds: web::Data<Arc<RwLock<HashSet<CrdCoordinates>>>>,
-) -> Result<HttpResponse, Error> {
-    println!("get_cluster_scoped_resource: {:?}", resource);
-    let resource = resource.into_inner();
-    // TODO: Check whether the requested API has been registered
-
-    let crd = get_api(&resource.group_version_kind, &storage).unwrap();
-
-    let resource_name = resource.resource.clone();
-    // We clone the name here because we need the resource later on for sending it to the event bus
-    let option: Option<Resource> = storage.get(&StorageKind::from(resource.group_version_kind), &resource_name);
-
-    Ok(HttpResponse::Ok().json(option.unwrap()))
-}
-*/

@@ -1,4 +1,4 @@
-use crate::models::{Metadata, Resource, Group, Kind, Namespace};
+use crate::models::{Metadata, Resource, Group, Namespace, ResourceType};
 
 use serde::de::DeserializeOwned;
 use thiserror::Error;
@@ -10,22 +10,24 @@ pub trait Storage {
     // TODO: Should this be a Result<Option<T>> instead?
     fn get_cluster_resource<T, U>(&self, key: &U) -> StorageResult<T>
         where T: Metadata + DeserializeOwned,
-              U: Debug + Group + Kind + Resource;
+              U: Debug + Group + ResourceType + Resource;
 
     fn list_cluster_resources<T, U>(&self, key: &U) -> Vec<T>
         where T: Metadata + DeserializeOwned,
-              U: Debug + Group + Kind;
+              U: Debug + Group + ResourceType;
 
     fn create_cluster_resource<T>(&self, key: &T, obj: &[u8]) -> StorageResult<()> // TODO: obj should not be a &[u8] but what should it be? Probably a "Resource" or something like that
-        where T: Debug + Group + Kind + Resource;
+        where T: Debug + Group + ResourceType + Resource;
 
     fn get_namespace_resource<T, U>(&self, key: &U) -> StorageResult<T>
         where T: Metadata + DeserializeOwned,
-              U: Debug + Group + Namespace + Kind + Resource;
-/*
-    fn list_namespace_resources<T>(&self, key: &GroupNamespaceKind) -> Vec<T>
-        where T: Metadata + DeserializeOwned;
+              U: Debug + Group + Namespace + ResourceType + Resource;
 
+    fn list_namespace_resources<T, U>(&self, key: &U) -> StorageResult<Vec<T>>
+        where T: Metadata + DeserializeOwned,
+              U: Debug + Group + Namespace + ResourceType;
+
+    /*
     fn create_namespace_resource(&self, key: &ClusterResource, obj: &[u8]) -> StorageResult<()>; // TODO: obj should not be a &[u8] but what should it be? Probably a "Resource" or something like that
 */
 }
@@ -37,7 +39,7 @@ pub enum StorageError {
 
     DatabaseError {
         source: Box<dyn std::error::Error>,
-    }, // TODO: Should maybe take another error
+    },
 
     #[error("Error validating data: {0}")]
     ModelError(String)

@@ -3,15 +3,11 @@ use actix_web::{get, HttpResponse, Responder, web};
 use crate::storage_sqlite::SqliteStorage;
 use crate::storage::Storage;
 use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
-use crate::models::GroupKind;
+use crate::helper::get_crd_resource_type;
 
 // TODO: All APIs probably need to return a kind: Status / 404 instead of empty lists when something doesn't exist
 // TODO: Do we also need /apis/{group} ? kubectl works without it but it'd be good to have for compatibility anyway
 
-// TODO: I'd love to make this a const but that doesn't work with Strings. We'd need to accept &str for that to work
-fn get_crd_kind() -> GroupKind {
-    GroupKind::new("apiextensions.k8s.io".to_string(), "customresourcedefinitions".to_string())
-}
 
 
 #[get("/api")]
@@ -31,7 +27,7 @@ pub async fn get_api_versions() -> impl Responder {
 pub async fn list_api_groups(
     storage: web::Data<SqliteStorage>,
 ) -> impl Responder {
-    let crds: Vec<CustomResourceDefinition> = storage.list_cluster_resources(&get_crd_kind());
+    let crds: Vec<CustomResourceDefinition> = storage.list_cluster_resources(&get_crd_resource_type());
 
     let mut groups = Vec::with_capacity(crds.len());
     // Iterate over each API Group and for each group iterate over its versions to create the final document
@@ -68,7 +64,7 @@ pub async fn list_resource_types(
     web::Path((group, version)): web::Path<(String, String)>,
     storage: web::Data<SqliteStorage>,
 ) -> impl Responder {
-    let crds: Vec<CustomResourceDefinition> = storage.list_cluster_resources(&get_crd_kind());
+    let crds: Vec<CustomResourceDefinition> = storage.list_cluster_resources(&get_crd_resource_type());
 
     let group_version = format!("{}/{}", group, version);
     let api_resources: Vec<APIResource> = crds.iter()

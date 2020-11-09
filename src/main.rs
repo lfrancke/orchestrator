@@ -1,5 +1,7 @@
 mod k8s_api;
 mod config;
+mod crd_manager;
+mod helper;
 mod resource_api;
 mod models;
 mod storage;
@@ -7,7 +9,7 @@ mod storage_sqlite;
 mod watch;
 
 use crate::config::OrchestratorConfig;
-use crate::resource_api::{create_cluster_resource, list_cluster_resources, get_cluster_resource, get_namespaced_resource};
+use crate::resource_api::{create_cluster_resource, list_cluster_resources, get_cluster_resource, get_namespaced_resource, get_crd, list_crds, create_crd};
 use crate::watch::{EventBroker, WatchEvent};
 
 use std::sync::mpsc::{Sender, Receiver};
@@ -87,6 +89,10 @@ async fn main() -> std::io::Result<()> {
             .service(list_api_groups)
             .service(get_api_versions)
             .service(list_resource_types)
+
+            .service(get_crd)
+            .service(list_crds)
+            .service(create_crd)
 
             // It is important that the following routes be added _after_ the more specific ones because this catches everything that begins with /apis
             .service(list_cluster_resources)
