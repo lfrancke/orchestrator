@@ -10,6 +10,7 @@ use crate::helper::{get_crd_for_resource, get_crd_resource_type};
 use std::sync::mpsc;
 use crate::watch::{WatchEvent, WatchStream, WrappedWatchEvent};
 use std::sync::mpsc::Sender;
+use k8s_openapi::apimachinery::pkg::apis::meta::v1::{ObjectMeta, ListMeta};
 
 
 // TODO: Make this return an Actix Error
@@ -132,11 +133,21 @@ pub async fn list_cluster_resources(
                 .streaming(body))
         }
         _ => {
+            let metadata = ListMeta {
+                continue_: None,
+                remaining_item_count: None,
+                // The kube-runtime 0.43 watcher barfs if this is not set.
+                // The docs say clients should pass this unmodified back to the server.
+                // I'm not sure what this field is used for in the ListMeta object.
+                resource_version: Some("UNUSED".to_string()),
+                self_link: None
+            };
+
             let resources_list: List<BaseResource> = List {
                 api_version: gvrt.group_version(),
                 items: storage.list_cluster_resources(&gvrt),
                 kind: crd.spec.names.kind,
-                metadata: Default::default(),
+                metadata,
             };
             Ok(HttpResponse::Ok().json(resources_list))
         }
@@ -158,7 +169,10 @@ pub async fn create_cluster_resource(
         .map_err(|e| ErrorBadRequest(e))?
         .ok_or(ErrorNotFound("API does not exist"))?;
 
-    let resource: BaseResource = serde_json::from_slice(bytes.bytes())?;
+    let mut resource: BaseResource = serde_json::from_slice(bytes.bytes())?;
+
+    resource.metadata.resource_version = Some("1".to_string());
+
     // We clone the name here because we need the resource later on for sending it to the event bus
     let cluster_resource = GroupResourceTypeResource::new(
         gvrt.group().to_string(),

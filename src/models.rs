@@ -343,6 +343,7 @@ impl<T: k8s_openapi::Metadata<Ty=ObjectMeta>> Metadata for T {
 }
 
 // TODO: The upstream list object implements a custom Serializer, look at that
+// We need our own version here because the upstream (k8s-openapi) version has a bound on ListableResource which we can't fulfil because we're dynamic
 #[derive(Serialize)]
 pub struct List<T> {
     #[serde(rename = "apiVersion")]
