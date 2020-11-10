@@ -10,7 +10,7 @@ mod watch;
 
 use crate::config::OrchestratorConfig;
 use crate::resource_api::{create_cluster_resource, list_cluster_resources, get_cluster_resource, get_namespaced_resource, get_crd, list_crds, create_crd};
-use crate::watch::{EventBroker, WatchEvent};
+use crate::watch::{EventBroker, WatchEvent, WrappedWatchEvent};
 
 use std::sync::mpsc::{Sender, Receiver};
 use std::sync::{mpsc, Arc};
@@ -20,6 +20,7 @@ use actix_web::{get, middleware::Logger, App, HttpRequest, HttpResponse, HttpSer
 use stackable_config::get_matcher;
 use storage_sqlite::SqliteStorage;
 use crate::k8s_api::{list_api_groups, get_api_versions, list_resource_types};
+use crate::models::GroupResourceType;
 
 
 #[actix_web::main]
@@ -52,8 +53,8 @@ async fn main() -> std::io::Result<()> {
     // For this to work we use channels and we have two pairs of those
     // * reg_{tx, rx} are used for registering new watches
     // * evt_{tx, rx} are used to exchange the actual events
-    let (reg_tx, reg_rx) = mpsc::channel::<Sender<WatchEvent>>();
-    let (evt_tx, evt_rx) = mpsc::channel::<WatchEvent>();
+    let (reg_tx, reg_rx) = mpsc::channel::<(GroupResourceType, Sender<WatchEvent>)>();
+    let (evt_tx, evt_rx) = mpsc::channel::<WrappedWatchEvent>();
 
     let storage = SqliteStorage::new();
 
@@ -113,7 +114,7 @@ async fn main() -> std::io::Result<()> {
     Ok(())
 }
 
-fn start_event_broker(reg_rx: Receiver<Sender<WatchEvent>>, evt_rx: Receiver<WatchEvent>) {
+fn start_event_broker(reg_rx: Receiver<(GroupResourceType, Sender<WatchEvent>)>, evt_rx: Receiver<WrappedWatchEvent>) {
     // Here we spawn two new threads
     // 1. Just waits for new registration events of Watchers
     // 2. Waits for new events coming in (e.g. ADDED, REMOVED, ...)
@@ -121,6 +122,7 @@ fn start_event_broker(reg_rx: Receiver<Sender<WatchEvent>>, evt_rx: Receiver<Wat
     // Because this event broker is shared across threads we wrap it in an Arc.
     // We could probably also use a single thread and use the `select!` macro instead but the
     // documentation for that is lacking and I couldn't find any good best practices.
+    // Or do it all in Tokio somehow...
     let event_broker = Arc::new(EventBroker::new());
 
     // event_broker being an Arc this only clones the reference and not the data

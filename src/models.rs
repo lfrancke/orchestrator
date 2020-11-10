@@ -23,7 +23,8 @@ pub trait Resource {
 //
 // GroupResourceType
 //
-#[derive(Debug, Deserialize)]
+// Eq and Hash are used because we use this type in a HashMap
+#[derive(Debug, Deserialize, Eq, Hash, PartialEq)]
 pub struct GroupResourceType {
     group: String,
     resource_type: String
@@ -356,7 +357,7 @@ pub struct List<T> {
     pub metadata: ListMeta,
 }
 
-
+#[derive(Debug, Deserialize)]
 pub struct ListOptions {
-    watch: bool
+    pub watch: Option<bool>
 }

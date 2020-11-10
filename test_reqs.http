@@ -148,6 +148,125 @@ Content-Type: application/json
   }
 }
 
+### Post a crontab CRD
+POST http://localhost:8080/apis/apiextensions.k8s.io/v1/customresourcedefinitions
+Content-Type: application/json
+
+{
+  "apiVersion": "apiextensions.k8s.io/v1",
+  "kind": "CustomResourceDefinition",
+  "metadata": {
+    "annotations": {
+      "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"apiextensions.k8s.io/v1\",\"kind\":\"CustomResourceDefinition\",\"metadata\":{\"annotations\":{},\"name\":\"crontabs.stable.example.com\"},\"spec\":{\"group\":\"stable.example.com\",\"names\":{\"kind\":\"CronTab\",\"plural\":\"crontabs\",\"shortNames\":[\"ct\"],\"singular\":\"crontab\"},\"scope\":\"Namespaced\",\"versions\":[{\"name\":\"v1\",\"schema\":{\"openAPIV3Schema\":{\"properties\":{\"spec\":{\"properties\":{\"cronSpec\":{\"type\":\"string\"},\"image\":{\"type\":\"string\"},\"replicas\":{\"type\":\"integer\"}},\"type\":\"object\"}},\"type\":\"object\"}},\"served\":true,\"storage\":true}]}}\n"
+    },
+    "creationTimestamp": "2020-10-26T15:47:10Z",
+    "generation": 1,
+    "managedFields": [
+      {
+        "apiVersion": "apiextensions.k8s.io/v1",
+        "fieldsType": "FieldsV1",
+        "fieldsV1": {
+          "f:status": {
+            "f:acceptedNames": {
+              "f:kind": {},
+              "f:listKind": {},
+              "f:plural": {},
+              "f:shortNames": {},
+              "f:singular": {}
+            },
+            "f:conditions": {}
+          }
+        },
+        "manager": "kube-apiserver",
+        "operation": "Update",
+        "time": "2020-10-26T15:47:10Z"
+      },
+      {
+        "apiVersion": "apiextensions.k8s.io/v1",
+        "fieldsType": "FieldsV1",
+        "fieldsV1": {
+          "f:metadata": {
+            "f:annotations": {
+              ".": {},
+              "f:kubectl.kubernetes.io/last-applied-configuration": {}
+            }
+          },
+          "f:spec": {
+            "f:conversion": {
+              ".": {},
+              "f:strategy": {}
+            },
+            "f:group": {},
+            "f:names": {
+              "f:kind": {},
+              "f:listKind": {},
+              "f:plural": {},
+              "f:shortNames": {},
+              "f:singular": {}
+            },
+            "f:scope": {},
+            "f:versions": {}
+          },
+          "f:status": {
+            "f:storedVersions": {}
+          }
+        },
+        "manager": "kubectl-client-side-apply",
+        "operation": "Update",
+        "time": "2020-10-26T15:47:10Z"
+      }
+    ],
+    "name": "crontabs2.stable.example.com",
+    "resourceVersion": "6438",
+    "uid": "e9e9ffed-6186-4fd3-b6eb-4e33e41fa0fa"
+  },
+  "spec": {
+    "conversion": {
+      "strategy": "None"
+    },
+    "group": "stable.example.com",
+    "names": {
+      "kind": "CronTab",
+      "listKind": "CronTabList",
+      "plural": "crontabs",
+      "shortNames": [
+        "ct"
+      ],
+      "singular": "crontab"
+    },
+    "scope": "Cluster",
+    "versions": [
+      {
+        "name": "v1",
+        "schema": {
+          "openAPIV3Schema": {
+            "properties": {
+              "spec": {
+                "properties": {
+                  "cronSpec": {
+                    "type": "string"
+                  },
+                  "image": {
+                    "type": "string"
+                  },
+                  "replicas": {
+                    "type": "integer"
+                  }
+                },
+                "type": "object"
+              }
+            },
+            "type": "object"
+          }
+        },
+        "served": true,
+        "storage": true
+      }
+    ]
+  }
+}
+
+
 ### Post a Crontab object
 POST http://localhost:8080/apis/stable.example.com/v1/crontabs
 Content-Type: application/json
@@ -229,7 +348,7 @@ GET http://localhost:8080/api
 ### K8S /apis
 GET http://localhost:8080/apis
 
-### Get all crontabs
+### List all crontabs
 GET http://localhost:8080/apis/stable.example.com/v1/crontabs
 
 ### Get the Crontab object we've posted before
@@ -237,3 +356,10 @@ GET http://localhost:8080/apis/stable.example.com/v1/crontabs/my-new-cron-object
 
 ###
 GET http://localhost:8080/apis/stable.example.com/v1/namespaces/my-namespace/crontabs/my-new-cron-object
+
+### Watch all crontabs
+GET http://localhost:8080/apis/stable.example.com/v1/crontabs?watch=true
+
+### Wrong parameter
+GET http://localhost:8080/apis/stable.example.com/v1/crontabs?watch=fatrnlse
+

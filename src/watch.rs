@@ -1,4 +1,4 @@
-use crate::models::BaseResource;
+use crate::models::{BaseResource, GroupResourceType};
 
 use std::pin::Pin;
 use std::sync::mpsc::{Receiver, Sender};
@@ -10,6 +10,7 @@ use actix_web::Error;
 use bytes::Bytes;
 use futures::Stream;
 use serde::Serialize;
+use std::collections::HashMap;
 
 
 /// Variants of this enum will be returned for all _watch_ requests.
@@ -20,44 +21,65 @@ pub enum WatchEvent {
     ADDED(BaseResource),
 }
 
-// This is the struct that will get notified about new events
+#[derive(Debug)]
+pub struct WrappedWatchEvent {
+    event: WatchEvent,
+    grt: GroupResourceType
+}
+
+impl WrappedWatchEvent {
+    pub fn new(event: WatchEvent, grt: GroupResourceType) -> WrappedWatchEvent {
+        WrappedWatchEvent {
+            event,
+            grt
+        }
+    }
+}
+
+/// The EventBroker is used to ferry events around the system.
+/// It gets notified about changes (e.g. new objects) and forwards those to interested parties.
 pub struct EventBroker {
-    observers: Mutex<Vec<Sender<WatchEvent>>>,
+    // TODO: This can be changed to RwLock<HashMap<GroupResourceType, RwLock<Vec<Sender<WatchEvent>>>>> instead (or similar)
+    observers: Mutex<HashMap<GroupResourceType, Vec<Sender<WatchEvent>>>>,
 }
 
 impl EventBroker {
     pub fn new() -> Self {
         Self {
-            observers: Mutex::new(vec![]),
+            observers: Mutex::new(HashMap::new()),
         }
     }
 
     /// A new event can be posted here
     // TODO: This should almost certainly be asynchronous so anything that posts a new event doesn't
     // have to wait for all watchers to be notified
-    pub fn new_event(&self, event: WatchEvent) {
-        let result = self.observers.lock().unwrap();
+    pub fn new_event(&self, event: WrappedWatchEvent) {
+        let mut observers = self.observers.lock().unwrap();
         println!(
             "Received new event, sending to [{}] observers: {:?}",
-            result.len(),
+            observers.len(),
             event
         );
-        result.iter().enumerate().for_each(|(idx, obs)| {
+
+        let mut grt_observers = observers.entry(event.grt).or_default();
+        let event = event.event;
+
+        grt_observers.iter().enumerate().for_each(|(idx, obs)| {
             let send_result = obs.send(event.clone());
             match send_result {
                 Err(_) => {
                     println!("Error sending, removing observer");
                     // TODO: Need to remove observer, this doesn't work yet:
-                    // result.swap_remove(idx);
+                    //grt_observers.swap_remove(idx);
                 }
                 Ok(_) => {}
             }
         });
     }
 
-    pub fn register(&self, observer: Sender<WatchEvent>) {
-        let mut foo = self.observers.lock().unwrap();
-        foo.push(observer);
+    pub fn register(&self, (grt, observer): (GroupResourceType, Sender<WatchEvent>)) {
+        let mut observers = self.observers.lock().unwrap();
+        observers.entry(grt).or_default().push(observer);
     }
 }
 

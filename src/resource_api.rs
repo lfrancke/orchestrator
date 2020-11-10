@@ -1,4 +1,4 @@
-use crate::models::{GroupVersionResourceType, List, BaseResource, GroupResourceType, Group, GroupResourceTypeResource, GroupVersionResourceTypeResource, GroupVersionNamespaceResourceTypeResource, GroupVersionNamespaceResourceType, ResourceType, Version};
+use crate::models::{GroupVersionResourceType, List, BaseResource, Group, GroupResourceTypeResource, GroupVersionResourceTypeResource, GroupVersionNamespaceResourceTypeResource, GroupVersionNamespaceResourceType, ResourceType, Version, ListOptions, GroupResourceType};
 use crate::storage::{Storage, StorageResult};
 use crate::storage_sqlite::SqliteStorage;
 
@@ -7,37 +7,9 @@ use actix_web::error::{ErrorNotFound, ErrorBadRequest};
 use bytes::Buf;
 use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
 use crate::helper::{get_crd_for_resource, get_crd_resource_type};
-
-
-/*
-/// This lists CustomResourceDefinitions registered in the server
-/// The request will currently always be a "watch" on new resources
-/// That means the result will be a never-ending HTTP response with newline-separated JSON objects
-#[get("/apis/apiextensions.k8s.io/v1/customresourcedefinitions")]
-pub async fn list_custom_resource_definitions(
-    watch_register: web::Data<Sender<Sender<WatchEvent>>>,
-    options: web::Query<ListOptions>,
-    storage: web::Data<SqliteStorage>
-) -> impl Responder {
-    return if options.watch {
-        // We're creating a new channel pair, the _sending_ end of which we send to the EventBroker
-        // The receiving end will be given to the WatchStream which
-        let (tx, rx) = mpsc::channel();
-        let res = watch_register.send(tx);
-
-        let body = WatchStream::new(rx);
-
-        HttpResponse::Ok()
-            .content_type("application/json")
-            .streaming(body)
-    } else {
-        let objects = storage.list();
-        HttpResponse::Ok()
-    }
-}
- */
-
-
+use std::sync::mpsc;
+use crate::watch::{WatchEvent, WatchStream, WrappedWatchEvent};
+use std::sync::mpsc::Sender;
 
 
 // TODO: Make this return an Actix Error
@@ -129,6 +101,8 @@ pub async fn get_cluster_resource(
 #[get("/apis/{group}/{version}/{resource_type}")]
 pub async fn list_cluster_resources(
     gvrt: web::Path<GroupVersionResourceType>,
+    watch_register: web::Data<Sender<(GroupResourceType, Sender<WatchEvent>)>>,
+    web::Query(options): web::Query<ListOptions>,
     storage: web::Data<SqliteStorage>,
 ) -> Result<HttpResponse, Error> {
     println!("list_cluster_scoped_resource_type: {:?}", gvrt); // TODO: Logging
@@ -138,13 +112,35 @@ pub async fn list_cluster_resources(
         .map_err(|e| ErrorBadRequest(e))?
         .ok_or(ErrorNotFound("API does not exist"))?;
 
-    let resources_list: List<BaseResource> = List {
-        api_version: gvrt.group_version(),
-        items: storage.list_cluster_resources(&gvrt),
-        kind: crd.spec.names.kind,
-        metadata: Default::default(),
-    };
-    Ok(HttpResponse::Ok().json(resources_list))
+    match options.watch {
+        Some(true) => {
+            // We're creating a new channel pair, the _sending_ end of which we send to the EventBroker
+            // The receiving end will be given to the WatchStream which will stream the received
+            // changes back to the calling client
+            let (tx, rx) = mpsc::channel();
+            let res = watch_register.send(
+                (GroupResourceType::new(
+                    gvrt.group().to_string(),
+                    gvrt.resource_type().to_string()
+                ),
+                 tx));
+
+            let body = WatchStream::new(rx);
+
+            Ok(HttpResponse::Ok()
+                .content_type("application/json")
+                .streaming(body))
+        }
+        _ => {
+            let resources_list: List<BaseResource> = List {
+                api_version: gvrt.group_version(),
+                items: storage.list_cluster_resources(&gvrt),
+                kind: crd.spec.names.kind,
+                metadata: Default::default(),
+            };
+            Ok(HttpResponse::Ok().json(resources_list))
+        }
+    }
 }
 
 
@@ -154,8 +150,7 @@ pub async fn create_cluster_resource(
     web::Path(gvrt): web::Path<GroupVersionResourceType>,
     storage: web::Data<SqliteStorage>,
     bytes: web::Bytes,
-    //event_sender: web::Data<Sender<WatchEvent>>,
-    //registered_crds: web::Data<Arc<RwLock<HashSet<CrdCoordinates>>>>,
+    event_sender: web::Data<Sender<WrappedWatchEvent>>,
 ) -> Result<HttpResponse, Error> {
     println!("create_cluster_resource: {:?}", gvrt);
 
@@ -168,25 +163,27 @@ pub async fn create_cluster_resource(
     let cluster_resource = GroupResourceTypeResource::new(
         gvrt.group().to_string(),
         gvrt.resource_type().to_string(),
-        resource.metadata.name.ok_or(ErrorBadRequest("metadata.name is empty".to_string()))?.clone(),
+        resource.metadata.name.clone().ok_or(ErrorBadRequest("metadata.name is empty".to_string()))?,
     );
     storage.create_cluster_resource(&cluster_resource, bytes.bytes());
 
-    Ok(HttpResponse::Ok().finish())
+    let event = WrappedWatchEvent::new(
+        WatchEvent::ADDED(resource),
+        GroupResourceType::new(
+            gvrt.group().to_string(),
+            gvrt.resource_type().to_string()
+        )
+    );
 
-    /*
-    if !registered_crds.read().unwrap().contains(&coordinates) {
-        return Ok(HttpResponse::NotFound().finish());
-    }
-    event_sender.send(WatchEvent::ADDED(crd));
-     */
+    event_sender.into_inner().send(event);
+
+    Ok(HttpResponse::Ok().finish())
 }
 
 
 //
 // Namespace Scoped Handlers
 //
-
 #[get("/apis/{group}/{version}/namespaces/{namespace}/{resource_type}/{resource}")]
 pub async fn get_namespaced_resource(
     web::Path(resource): web::Path<GroupVersionNamespaceResourceTypeResource>,
