@@ -1,0 +1,23 @@
+= Stackable Orchestrator
+
+**This project is highly experimental and unstable**
+
+The Stackable Orchestrator is an implementation of a very limited subset of the https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.19/[`kube-apiserver` API].
+The major difference (apart from all the missing functionality) is that this Orchestrator _only_ supports custom resources.
+
+At the moment `CustomResourceDefinition` is the only built-in resource.
+All others have to be added as `CRD`s.
+
+The goal is to be able to use _kubectl_ to talk to this Orchestrator.
+
+== Setup
+
+The Orchestrator currently stores its data in a SQLite database which needs to be created first using the `db/create_db.sh` script.
+It does not take any parameters and creates an `orchestrator.db` file in the main directory.
+
+
+== Running
+
+    cargo run
+
+Binds to `localhost:8080` by default and can (currently) not be overridden.
